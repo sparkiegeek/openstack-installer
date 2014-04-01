@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+
+    <title>Cloud-installer by Ubuntu-Solutions-Engineering</title>
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <h1>Cloud-installer</h1>
+        <h2>Ubuntu cloud installer</h2>
+
+        <section id="downloads">
+          <a href="https://github.com/Ubuntu-Solutions-Engineering/cloud-installer/zipball/master" class="btn">Download as .zip</a>
+          <a href="https://github.com/Ubuntu-Solutions-Engineering/cloud-installer/tarball/master" class="btn">Download as .tar.gz</a>
+          <a href="https://github.com/Ubuntu-Solutions-Engineering/cloud-installer" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1>
+<a name="ubuntu-cloud-installer" class="anchor" href="#ubuntu-cloud-installer"><span class="octicon octicon-link"></span></a>Ubuntu Cloud Installer</h1>
+
+<h2>
+<a name="developers" class="anchor" href="#developers"><span class="octicon octicon-link"></span></a>Developers</h2>
+
+<h3>
+<a name="pre-reqs" class="anchor" href="#pre-reqs"><span class="octicon octicon-link"></span></a>Pre-reqs</h3>
+
+<ul>
+<li>debhelper</li>
+<li>dh-python</li>
+<li>python3-all</li>
+<li>python3-mock</li>
+<li>python3-nose</li>
+<li>python3-oauthlib</li>
+<li>python3-passlib</li>
+<li>python3-requests</li>
+<li>python3-requests-oauthlib</li>
+<li>python3-setuptools</li>
+<li>python3-urwid</li>
+<li>python3-ws4py</li>
+<li>python3-yaml</li>
+</ul><h3>
+<a name="running-tests" class="anchor" href="#running-tests"><span class="octicon octicon-link"></span></a>Running tests</h3>
+
+<p><code>$ nosetests3 test</code></p>
+
+<h3>
+<a name="building-a-package" class="anchor" href="#building-a-package"><span class="octicon octicon-link"></span></a>Building a package</h3>
+
+<p><code>$ make deb</code></p>
+
+<p>This will build a package for the current host system. If you wish to
+build for other releases please checkout
+<a href="https://wiki.ubuntu.com/SimpleSbuild">sbuild</a></p>
+
+<h3>
+<a name="building-the-tarball-only" class="anchor" href="#building-the-tarball-only"><span class="octicon octicon-link"></span></a>Building the tarball only</h3>
+
+<p><code>$ make tarball</code></p>
+
+<h3>
+<a name="cleaning" class="anchor" href="#cleaning"><span class="octicon octicon-link"></span></a>Cleaning</h3>
+
+<p><code>$ make clean</code></p>
+
+<h2>
+<a name="installing" class="anchor" href="#installing"><span class="octicon octicon-link"></span></a>Installing</h2>
+
+<h3>
+<a name="ppa" class="anchor" href="#ppa"><span class="octicon octicon-link"></span></a>PPA</h3>
+
+<p><code>$ sudo apt-add-repository ppa:cloud-installer/ppa</code></p>
+
+<h3>
+<a name="running" class="anchor" href="#running"><span class="octicon octicon-link"></span></a>Running</h3>
+
+<p><code>$ sudo cloud-install</code></p>
+
+<h1>
+<a name="copyright" class="anchor" href="#copyright"><span class="octicon octicon-link"></span></a>Copyright</h1>
+
+<p>Copyright 2014 Canonical, Ltd.</p>
+
+<h1>
+<a name="license" class="anchor" href="#license"><span class="octicon octicon-link"></span></a>License</h1>
+
+<p>This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.</p>
+      </section>
+    </div>
+
+    
+  </body>
+</html>
