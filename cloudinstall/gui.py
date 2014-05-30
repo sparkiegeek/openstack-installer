@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-""" Pegasus - gui interface to Ubuntu Cloud Installer """
+""" Pegasus - gui interface to  Installer """
 
 from operator import attrgetter
 from os import write, close, path
@@ -39,7 +39,7 @@ from cloudinstall import utils
 
 log = logging.getLogger('cloudinstall.gui')
 
-TITLE_TEXT = "Ubuntu Cloud Installer"
+TITLE_TEXT = "Ubuntu Openstack Installer"
 
 # - Properties ----------------------------------------------------------------
 IS_TTY = re.match('/dev/tty[0-9]', utils.get_command_output('tty')[1])
