@@ -26,6 +26,7 @@ import threading
 import logging
 from importlib import import_module
 import pkgutil
+from multiprocessing import cpu_count
 
 from urwid import (AttrWrap, AttrMap, Text, Columns, Overlay, LineBox,
                    ListBox, Filler, Button, BoxAdapter, Frame, WidgetWrap,
@@ -655,6 +656,9 @@ class PegasusGUI(MainLoop):
     @utils.async
     def init_machine(self):
         """ Handles intial deployment of a machine """
+        max_cpus = cpu_count()
+        if max_cpus >= 2:
+            max_cpus = max_cpus // 2
         if pegasus.MULTI_SYSTEM:
             return
         else:
@@ -662,7 +666,7 @@ class PegasusGUI(MainLoop):
             if len(allocated) == 0:
                 self.cr.add_machine(constraints={'mem': '3G',
                                                  'root-disk': '20G',
-                                                 'cpu-cores': '3'})
+                                                 'cpu-cores': max_cpus})
 
     def _key_pressed(self, keys, raw):
         # We use this as an 'input filter' just to hook when keys are pressed;
