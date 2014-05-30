@@ -18,4 +18,4 @@
 
 """ Ubuntu Openstack Installer """
 
-__version__ = "0.15+git20140501"
+__version__ = "0.16+git20140530"
