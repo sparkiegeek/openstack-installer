@@ -22,6 +22,7 @@ import logging
 
 log = logging.getLogger('c.service')
 
+
 class Unit:
     """ Unit class """
 
@@ -121,7 +122,8 @@ class Relation:
 
     def __repr__(self):
         return "<Relation: {name}, {charms}>".format(name=self.relation_name,
-                                                       charms=self.charms)
+                                                     charms=self.charms)
+
 
 class Service:
     """ Service class """
@@ -174,7 +176,6 @@ class Service:
         for unit_name, units in self.service.get('units', {}).items():
             yield Unit(unit_name, units)
 
-
     def relation(self, name):
         """ Single relation entry
 
@@ -198,7 +199,6 @@ class Service:
         for relation_name, relation in \
             self.service.get('relations', {}).items():
             yield Relation(relation_name, relation)
-
 
     def __repr__(self):
         return "<Service: {name} " \
