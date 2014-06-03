@@ -26,6 +26,7 @@ from cloudinstall.service import Service
 
 log = logging.getLogger(__name__)
 
+
 class JujuState:
     """ Represents a global Juju state """
 
