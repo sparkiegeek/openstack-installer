@@ -44,7 +44,7 @@ class JujuState:
         state.
         """
         return machine.is_machine_1 and \
-             machine.agent_state in self.valid_states
+            machine.agent_state in self.valid_states
 
     def __validate_unallocation(self, machine):
         """ Private function to test if machine is in an unallocated

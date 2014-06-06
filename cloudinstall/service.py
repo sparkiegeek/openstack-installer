@@ -184,7 +184,8 @@ class Service:
         :rtype: Relation()
         """
         try:
-            r = list(filter(lambda r: r.relation_name == name, self.relations))[0]
+            r = list(filter(lambda r: r.relation_name == name,
+                            self.relations))[0]
             return r
         except IndexError:
             return Relation('unknown', [])
@@ -197,7 +198,7 @@ class Service:
         :rtype: Relation()
         """
         for relation_name, relation in \
-            self.service.get('relations', {}).items():
+                self.service.get('relations', {}).items():
             yield Relation(relation_name, relation)
 
     def __repr__(self):
