@@ -1,5 +1,5 @@
 #
-# glance.py - Glance Charm instructions
+# swift-proxy.py - Swift-proxy instructions
 #
 # Copyright 2014 Canonical, Ltd.
 #
@@ -19,11 +19,16 @@
 from cloudinstall.charms import CharmBase
 
 
-class CharmGlance(CharmBase):
-    """ Openstack Glance directives """
+class CharmSwiftProxy(CharmBase):
+    """ swift directives """
 
-    charm_name = 'glance'
-    display_name = 'Glance'
-    related = ['mysql', 'keystone', 'rabbitmq-server', 'swift-proxy']
+    charm_name = 'swift-proxy'
+    display_name = 'Swift Proxy'
+    related = ['keystone']
+    deploy_priority = 5
+    constraints = {'mem': '1G',
+                   'root-disk': '8G'}
+    optional = True
+    allow_multi_units = True
 
-__charm_class__ = CharmGlance
+__charm_class__ = CharmSwiftProxy

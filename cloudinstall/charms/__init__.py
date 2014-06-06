@@ -39,6 +39,8 @@ class CharmBase:
     configfile = expanduser("~/.cloud-install/charmconf.yaml")
     deploy_priority = sys.maxsize
     allow_multi_units = False
+    optional = False
+    disabled = False
 
     def __init__(self, juju_state=None, machine=None):
         """ initialize
