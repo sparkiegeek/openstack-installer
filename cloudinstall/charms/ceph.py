@@ -32,7 +32,7 @@ class CharmCeph(CharmBase):
     deploy_priority = 5
     default_instances = 3
     optional = True
-    disabled = False
+    disabled = True
     allow_multi_units = True
 
     def has_quorum(self):
