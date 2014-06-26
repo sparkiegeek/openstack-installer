@@ -18,7 +18,7 @@
 
 import logging
 
-from cloudinstall.charms import CharmBase
+from cloudinstall.charms import CharmBase, DisplayPriorities
 
 log = logging.getLogger('cloudinstall.charms.ceph')
 
@@ -28,11 +28,12 @@ class CharmCeph(CharmBase):
 
     charm_name = 'ceph'
     display_name = 'Ceph'
+    display_priority = DisplayPriorities.Storage
     related = ['glance', 'mysql', 'rabbitmq-server']
     deploy_priority = 5
     default_instances = 3
     optional = True
-    disabled = True
+    disabled = False
     allow_multi_units = True
 
     def has_quorum(self):

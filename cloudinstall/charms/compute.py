@@ -16,7 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from cloudinstall.charms import CharmBase
+import logging
+from cloudinstall.charms import CharmBase, DisplayPriorities
+from cloudinstall.pegasus import poll_state
+
+log = logging.getLogger('cloudinstall.charms.compute')
 
 
 class CharmNovaCompute(CharmBase):
@@ -24,19 +28,27 @@ class CharmNovaCompute(CharmBase):
 
     charm_name = 'nova-compute'
     display_name = 'Nova Compute Node'
-    related = ['mysql', 'rabbitmq-server', 'glance', 'nova-cloud-controller']
+    display_priority = DisplayPriorities.Compute
+    related = ['mysql', 'glance', 'nova-cloud-controller']
     isolate = True
     constraints = {'mem': '4G',
-                   'root-disk': '10G'}
+                   'root-disk': '40G'}
     allow_multi_units = True
 
     def set_relations(self):
         super(CharmNovaCompute, self).set_relations()
-        services = self.juju_state.service(self.charm_name)
-        for charm in self.related:
-            if not self.is_related(charm, services.relations) \
-               and 'rabbitmq-server' in charm:
-                self.client.add_relation("{c}:amqp".format(c=self.charm_name),
-                                         "rabbitmq-server:amqp")
+        juju, _ = poll_state()
+        service = juju.service(self.charm_name)
+        has_amqp = list(filter(lambda r: 'amqp' in r.relation_name,
+                        service.relations))
+        if len(has_amqp) == 0:
+            log.debug("Setting amqp relation for compute.")
+            ret = self.client.add_relation("{c}:amqp".format(
+                                           c=self.charm_name),
+                                           "rabbitmq-server:amqp")
+            if ret:
+                log.error("Problem relating nova-compute to rabbitmq")
+                return True
+            return False
 
 __charm_class__ = CharmNovaCompute

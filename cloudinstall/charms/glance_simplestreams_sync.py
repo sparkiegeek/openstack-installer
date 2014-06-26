@@ -1,5 +1,4 @@
 #
-# jujugui.py - Juju GUI instructions
 #
 # Copyright 2014 Canonical, Ltd.
 #
@@ -19,12 +18,12 @@
 from cloudinstall.charms import CharmBase, DisplayPriorities
 
 
-class CharmJujuGui(CharmBase):
-    """ Juju gui directives """
+class CharmGlanceSimplestreamsSync(CharmBase):
+    """ Charm directives for glance-simplestreams-sync  """
 
-    charm_name = 'juju-gui'
-    display_name = 'Juju GUI'
+    charm_name = 'glance-simplestreams-sync'
+    display_name = 'Glance - Simplestreams Image Sync'
     display_priority = DisplayPriorities.Other
-    deploy_priority = 0         # deploy before all other charms
+    related = ['keystone']
 
-__charm_class__ = CharmJujuGui
+__charm_class__ = CharmGlanceSimplestreamsSync

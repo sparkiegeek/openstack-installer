@@ -16,6 +16,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# Juju MAAS config
+#
+# configMaasEnvironment address credentials secret proxy
+#
+# See configureJuju
+#
 configMaasEnvironment()
 {
 	cat <<-EOF
@@ -34,6 +40,12 @@ configMaasEnvironment()
 		EOF
 }
 
+# Juju local config
+#
+# configLocalEnvironment
+#
+# See configureJuju
+#
 configLocalEnvironment()
 {
 	cat <<-EOF
@@ -47,6 +59,10 @@ configLocalEnvironment()
 		EOF
 }
 
+# Charm config
+#
+# configCharmOptions password
+#
 configCharmOptions()
 {
 	cat <<-EOF
@@ -57,9 +73,26 @@ configCharmOptions()
                   password: $1
                 mysql:
                   dataset-size: 512M
+                swift-proxy:
+                  zone-assignment: auto
+                  replicas: 3
+                  use-https: 'no'
+                swift-storage:
+                  zone: 1
+                  block-device: /etc/swift/storage.img|2G
+                quantum-gateway:
+                  instance-mtu: 1400
+                nova-cloud-controller:
+                  network-manager: Neutron
+                glance-simplestreams-sync:
+                  use_swift: False
 		EOF
 }
 
+# Configure Juju
+#
+# configureJuju type type-arguments
+#
 configureJuju()
 {
 	env_type=$1
@@ -74,10 +107,23 @@ configureJuju()
 	    "/home/$INSTALL_USER/.juju/environments.yaml"
 }
 
+# Bootstrap Juju inside container
+#
+# Creates an LXC container, registers it in MAAS (as a fake machine), then
+# bootstraps Juju using normal MAAS provider process.
+#
+# jujuBootstrap uuid
+#
 # TODO break this function into smaller ones
 jujuBootstrap()
 {
 	cluster_uuid=$1
+
+	# Juju >= 1.19 supports vlans. Since we're bootstrapping into a container,
+	# when they try to modprobe the vlan module it won't work (viz. LP #1316762)
+	# inside the container, so our solution is to add it outside the container so
+	# that containers can use vlans.
+	modprobe 8021q
 
 	lxc-create -n juju-bootstrap -t ubuntu-cloud -- -r trusty
 	sed -e "s/^lxc.network.link.*$/lxc.network.link = br0/" -i \

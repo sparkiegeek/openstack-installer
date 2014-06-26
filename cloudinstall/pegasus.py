@@ -43,6 +43,8 @@ COMPUTE = "Compute"
 OBJECT_STORAGE = "Object Storage"
 BLOCK_STORAGE = "Block Storage"
 
+# NOTE: this appears to be out of date
+# see LP bug 1319222
 ALLOCATION = {
     NOVA_CLOUD_CONTROLLER: CONTROLLER,
     NOVA_COMPUTE: COMPUTE,
@@ -79,22 +81,12 @@ def poll_state():
     :rtype: tuple (JujuState(), MaasState())
     """
     # Capture Juju state
-    (ret, juju_stdout,
-     juju_stderr, _) = utils.get_command_output('juju status',
-                                                combine_output=False)
-    if ret:
-        log.debug("Juju state unknown, will re-poll in "
-                  "case bootstrap is taking a little longer to come up.")
-        log.debug("Juju status output: {o} \n stderr: {e}".format(
-            o=juju_stdout, e=juju_stderr))
-        # Stub out a juju status for now
-        juju = JujuState('environment: local\nmachines:')
-    else:
-        try:
-            juju = JujuState(juju_stdout)
-        except:
-            log.exception("Ignoring exception in parsing juju state.")
-            juju = JujuState('environment: local\nmachines:')
+    cmd = utils.get_command_output('juju status',
+                                   combine_output=False)
+    if cmd['ret']:
+        raise SystemExit("Error connecting to juju: stderr: {e}".format(
+            e=cmd['stderr']))
+    juju = JujuState(cmd['stdout'])
 
     maas = None
     if MULTI_SYSTEM:

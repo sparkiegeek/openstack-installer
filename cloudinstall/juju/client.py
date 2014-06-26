@@ -139,9 +139,10 @@ class JujuClient:
             if opts:
                 cmd = ("{cmd} --constraints \"{opts}\"".format(
                     cmd=cmd, opts=" ".join(opts)))
-        ret, out, _, _ = get_command_output(cmd)
-        log.debug("Machine added: {cmd} ({out})".format(cmd=cmd, out=out))
-        return out
+        cmd_ = get_command_output(cmd)
+        log.debug("Machine added: {cmd} ({out})".format(cmd=cmd,
+                                                        out=cmd_['stdout']))
+        return cmd_['stdout']
 
     # def add_machines(self, machines):
     #     """ Add machines """
@@ -159,10 +160,13 @@ class JujuClient:
         """ Add relation between services """
         cmd = "juju add-relation {a} {b}".format(a=endpoint_a,
                                                  b=endpoint_b)
-        log.debug("Adding relation {a} <-> {b}".format(a=endpoint_a,
-                                                       b=endpoint_b))
-        ret, out, _, _ = get_command_output(cmd)
-        return out
+        cmd_ = get_command_output(cmd, combine_output=True)
+        log.debug("Adding relation ({a},{b}) ".format(a=endpoint_a,
+                                                      b=endpoint_b))
+        if cmd_['ret']:
+            log.error("Result: {r}".format(r=cmd_['stdout']))
+            return True
+        return False
 
     # def remove_relation(self, endpoint_a, endpoint_b):
     #     """ Removes relation """
@@ -210,11 +214,11 @@ class JujuClient:
         cmd += " {charm}".format(charm=charm)
         log.debug("Deploying {charm} -> {cmd}".format(charm=charm, cmd=cmd))
 
-        ret, out, _, _ = get_command_output(cmd)
-        log.debug("Deploy result: {out}".format(out=out))
-        if ret:
-            log.warning("Deploy error ({cmd}): {out}".format(cmd=cmd,
-                                                             out=out))
+        cmd_ = get_command_output(cmd)
+        log.debug("Deploy result: {out}".format(out=cmd_['stdout']))
+        if cmd_['ret']:
+            log.warning("Deploy error ({cmd}): "
+                        "{out}".format(cmd=cmd, out=cmd_['stdout']))
 
     # def set_config(self, service_name, config_keys):
     #     """ Sets machine config """
@@ -234,10 +238,10 @@ class JujuClient:
         for k, v in config_keys.items():
             cmd = "juju set {service} {k}={v}".format(service=service_name,
                                                       k=k, v=v)
-            ret, out, _, _ = get_command_output(cmd)
-            if ret:
+            cmd_ = get_command_output(cmd)
+            if cmd_['ret']:
                 log.warning("Problem setting config: "
-                            "{out}".format(out=out))
+                            "{out}".format(out=cmd_['stdout']))
 
     # def unset_config(self, service_name, config_keys):
     #     """ Unsets machine config """
@@ -338,11 +342,11 @@ class JujuClient:
             cmd += " -n {count}".format(count=count)
         log.debug("Adding additional {name}, cmd='{cmd}'".format(
             name=service_name, cmd=cmd))
-        ret, out, _, _ = get_command_output(cmd)
-        if ret:
+        cmd_ = get_command_output(cmd)
+        if cmd_['ret']:
             log.warning("Problem adding {name} "
                         "{out}".format(name=service_name,
-                                       out=out))
+                                       out=cmd_['stdout']))
 
     # def remove_unit(self, unit_names):
     #     """ Removes unit """

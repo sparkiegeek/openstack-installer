@@ -55,7 +55,7 @@ class Unit:
         :returns: address of unit
         :rtype: str
         """
-        return self.unit.get('public-address', '0.0.0.0')
+        return self.unit.get('public-address', None)
 
     @property
     def agent_state_info(self):
@@ -161,16 +161,13 @@ class Service:
                 return True
             return False
 
-        try:
-            return next(filter(_match, self.units))
-        except StopIteration:
-            return Unit('unknown', [])
+        return next(filter(_match, self.units), Unit('unknown', []))
 
     @property
     def units(self):
         """ Service units
 
-        :returns: list associated units for service
+        :returns: iterator of associated units for service
         :rtype: Unit()
         """
         for unit_name, units in self.service.get('units', {}).items():
@@ -183,22 +180,20 @@ class Service:
         :returns: a Relation entry
         :rtype: Relation()
         """
-        try:
-            r = list(filter(lambda r: r.relation_name == name,
-                            self.relations))[0]
-            return r
-        except IndexError:
-            return Relation('unknown', [])
+        r = next(filter(lambda r: r.relation_name == name,
+                        self.relations),
+                 Relation('unknown', []))
+        return r
 
     @property
     def relations(self):
         """ Service relations
 
-        :returns: list of relations for service
+        :returns: iterator of relations for service
         :rtype: Relation()
         """
-        for relation_name, relation in \
-                self.service.get('relations', {}).items():
+        relations = self.service.get('relations', {})
+        for relation_name, relation in relations.items():
             yield Relation(relation_name, relation)
 
     def __repr__(self):

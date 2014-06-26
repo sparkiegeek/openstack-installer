@@ -15,4 +15,4 @@ cat <<-"EOF" > /etc/network/interfaces.d/bridge.cfg
 	iface lxcbr0 inet dhcp
 	    bridge_ports eth0
 	EOF
-ifup lxcbr0 eth0
+ifup eth0 lxcbr0

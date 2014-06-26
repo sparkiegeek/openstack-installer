@@ -16,9 +16,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# Multi-system install
+#
+# multiInstall
+#
 multiInstall()
 {
 	cp /etc/network/interfaces /etc/cloud-installer/interfaces.cloud.bak
+	cp -r /etc/network/interfaces.d /etc/cloud-installer/interfaces.cloud.d.bak
 	echo $interface > /etc/cloud-installer/interface
 
 	dialogGaugeStart Installing "Please wait" 8 70 0
@@ -48,9 +53,7 @@ multiInstall()
 		createMaasBridge $interface
 		dialogGaugePrompt 34 "Configuring MAAS networking"
 
-		configureMaasServices $(ipAddress br0)
-
-		if [ -n "$bridge_interface" ]; then
+		if [ "$bridge_interface" = true ]; then
 			gateway=$(ipAddress br0)
 			configureNat $(ipNetwork br0)
 			enableIpForwarding
@@ -87,6 +90,12 @@ multiInstall()
 	dialogGaugeStop
 }
 
+# Store MAAS credentials
+#
+# saveMaasCreds credentials
+#
+# See multiInstall
+#
 saveMaasCreds()
 {
 	echo $1 > "/home/$INSTALL_USER/.cloud-install/maas-creds"
@@ -95,6 +104,12 @@ saveMaasCreds()
 	    "/home/$INSTALL_USER/.cloud-install/maas-creds"
 }
 
+# Setup multi install
+#
+# setupMultiInstall
+#
+# See multiInstall
+#
 setupMultiInstall()
 {
 	mkdir -m 0700 -p "/home/$INSTALL_USER/.cloud-install"
@@ -108,6 +123,12 @@ setupMultiInstall()
           "/home/$INSTALL_USER/.cloud-install/charmconf.yaml"
 }
 
+# Configure interface
+#
+# testAndConfigureInterface
+#
+# See multiInstall
+#
 testAndConfigureInterface()
 {
 	if [ -z "$(ipAddress $interface)" ]; then

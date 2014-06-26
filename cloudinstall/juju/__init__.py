@@ -37,20 +37,8 @@ class JujuState:
         :param raw_yaml: YAML object
         """
         self._yaml = yaml.load(raw_yaml)
+        assert isinstance(self._yaml, dict)
         self.valid_states = ['pending', 'started', 'down']
-
-    def __validate_allocation(self, machine):
-        """ Private function to test if machine is in an allocated
-        state.
-        """
-        return machine.is_machine_1 and \
-            machine.agent_state in self.valid_states
-
-    def __validate_unallocation(self, machine):
-        """ Private function to test if machine is in an unallocated
-        state.
-        """
-        return not machine.is_machine_1
 
     def machine(self, machine_id):
         """ Return single machine state
@@ -59,11 +47,9 @@ class JujuState:
         :returns: machine
         :rtype: cloudinstall.machine.Machine()
         """
-        try:
-            return next(filter(lambda x: x.machine_id == machine_id,
-                               self.machines()))
-        except StopIteration:
-            return Machine(-1, {})
+        r = next(filter(lambda x: x.machine_id == machine_id,
+                 self.machines()), Machine(-1, {}))
+        return r
 
     def machines(self):
         """ Machines property
@@ -92,11 +78,9 @@ class JujuState:
         :returns: a service entry or None
         :rtype: Service()
         """
-        try:
-            return next(filter(lambda s: s.service_name == name,
-                               self.services))
-        except StopIteration:
-            return None
+        r = next(filter(lambda s: s.service_name == name,
+                        self.services), Service(name, {}))
+        return r
 
     @property
     def services(self):

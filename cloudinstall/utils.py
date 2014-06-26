@@ -27,11 +27,24 @@ import logging
 from threading import Thread
 from functools import wraps
 from time import strftime
+from importlib import import_module
+import pkgutil
 
 log = logging.getLogger('cloudinstall.utils')
 
 # String with number of minutes, or None.
 blank_len = None
+
+
+def load_charms():
+    """ Load known charm modules
+    """
+    import cloudinstall.charms
+
+    charm_modules = [import_module('cloudinstall.charms.' + mname)
+                     for (_, mname, _) in
+                     pkgutil.iter_modules(cloudinstall.charms.__path__)]
+    return charm_modules
 
 
 def async(func):
@@ -53,13 +66,13 @@ def get_command_output(command, timeout=300, combine_output=True):
     :param timeout: (optional) use 'timeout' to limit time. default 300
     :param combine_output: (optional) combine stderr and stdout. default True.
     :type command: str
-    :returns: (returncode, stdout, stderr, 0)
-    :rtype: tuple
+    :returns: {ret: returncode, stdout: stdout, stderr: stderr)
+    :rtype: dict
 
     .. code::
 
         # Get output of juju status
-        ret, out, err, rtime = utils.get_command_output('juju status')
+        cmd_dict = utils.get_command_output('juju status')
     """
     cmd_env = os.environ.copy()
     # set consistent locale
@@ -78,7 +91,31 @@ def get_command_output(command, timeout=300, combine_output=True):
     stdout, stderr = p.communicate()
     if stderr:
         stderr = stderr.decode('utf-8')
-    return (p.returncode, stdout.decode('utf-8'), stderr, 0)
+    return dict(ret=p.returncode,
+                stdout=stdout.decode('utf-8'),
+                stderr=stderr)
+
+
+def remote_cp(machine_id, src, dst):
+    log.debug("Remote copying {src} to {dst} on machine {m}".format(
+        src=src,
+        dst=dst,
+        m=machine_id))
+    ret = get_command_output(
+        "juju scp {src} {m}:{dst}".format(src=src, dst=dst, m=machine_id))
+    log.debug("Remote copy result: {r}".format(r=ret))
+
+
+def remote_run(machine_id, cmds):
+    if type(cmds) is list:
+        cmds = " && ".join(cmds)
+    log.debug("Remote running ({cmds}) on machine {m}".format(
+        m=machine_id, cmds=cmds))
+    ret = get_command_output(
+        "juju run --machine {m} '{cmds}'".format(m=machine_id,
+                                                 cmds=cmds))
+    log.debug("Remote run result: {r}".format(r=ret))
+    return ret
 
 
 def get_network_interface(iface):
@@ -94,8 +131,8 @@ def get_network_interface(iface):
         # Get address, broadcast, and netmask of eth0
         iface = utils.get_network_interface('eth0')
     """
-    status, output, _, _ = get_command_output('ifconfig %s' % (iface,))
-    line = output.split('\n')[1:2][0].lstrip()
+    cmd = get_command_output('ifconfig %s' % (iface,))
+    line = cmd['stdout'].split('\n')[1:2][0].lstrip()
     regex = re.compile('^inet addr:([0-9]+(?:\.[0-9]+){3})\s+'
                        'Bcast:([0-9]+(?:\.[0-9]+){3})\s+'
                        'Mask:([0-9]+(?:\.[0-9]+){3})')
@@ -113,8 +150,8 @@ def get_network_interfaces():
     :returns: available interfaces and their properties
     :rtype: generator
     """
-    status, output, _, _ = get_command_output('ifconfig -s')
-    _ifconfig = output.split('\n')[1:-1]
+    cmd = get_command_output('ifconfig -s')
+    _ifconfig = cmd['sdout'].split('\n')[1:-1]
     for i in _ifconfig:
         name = i.split(' ')[0]
         if 'lo' not in name:
@@ -127,8 +164,8 @@ def get_host_mem():
     Mostly used as a backup if no data can be pulled from
     the normal means in Machine()
     """
-    _, out, _, _ = get_command_output('head -n1 /proc/meminfo')
-    out = out.rstrip()
+    cmd = get_command_output('head -n1 /proc/meminfo')
+    out = cmd['stdout'].rstrip()
     regex = re.compile('^MemTotal:\s+(\d+)\skB')
     match = re.match(regex, out)
     if match:
@@ -144,11 +181,11 @@ def get_host_storage():
 
     LXC doesn't report storage so we pull from host
     """
-    ret, out, _, _ = get_command_output('df -B G --total -l --output=avail'
-                                        ' -x devtmpfs -x tmpfs | tail -n 1'
-                                        ' | tr -d "G"')
-    if not ret:
-        return out.lstrip()
+    cmd = get_command_output('df -B G --total -l --output=avail'
+                             ' -x devtmpfs -x tmpfs | tail -n 1'
+                             ' | tr -d "G"')
+    if not cmd['ret']:
+        return cmd['stdout'].lstrip()
     else:
         return 0
 
@@ -159,9 +196,9 @@ def get_host_cpu_cores():
     A backup if no data can be pulled from
     Machine()
     """
-    _, out, _, _ = get_command_output('nproc')
-    if out:
-        return out.strip()
+    cmd = get_command_output('nproc')
+    if cmd['stdout']:
+        return cmd['stdout'].strip()
     else:
         return 'N/A'
 

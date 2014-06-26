@@ -29,15 +29,17 @@
 OPT_HELP=h
 OPT_INSTALL=i
 OPT_CONFIGFILE=c
-OPTS=:${OPT_INSTALL}${OPT_HELP}${OPT_CONFIGFILE}:
+OPT_ENABLESWIFT=s
+OPTS=:${OPT_CONFIGFILE}:${OPT_INSTALL}${OPT_ENABLESWIFT}${OPT_HELP}
 USAGE="\
-cloud-install [-${OPT_TYPE}${OPT_CONFIGFILE}${OPT_HELP}]
+cloud-install [-${OPT_CONFIGFILE}${OPT_INSTALL}${OPT_ENABLESWIFT}${OPT_HELP}]
 
 Create an Ubuntu Openstack Cloud! (requires root privileges)
 
 Options:
   -$OPT_CONFIGFILE <file> - POSIX shell script to be sourced by installer
       automating install by pre-setting menu responses.
+  -$OPT_ENABLESWIFT enable swift-storage
   -$OPT_INSTALL  install only (don't invoke cloud-status)
   -$OPT_HELP  print this message"
 
@@ -57,6 +59,9 @@ while getopts $OPTS opt; do
 	$OPT_INSTALL)
 		install=true
 		;;
+	$OPT_ENABLESWIFT)
+		enableswift="--enable-swift"
+		;;
 	$OPT_HELP)
 		usage
 		exit 0
@@ -68,6 +73,10 @@ while getopts $OPTS opt; do
 		usageError "Unknown argument: $OPTARG"
 		exit 1
 		;;
+	:)
+		usageError "Option $OPTARG requires an argument"
+		exit 1
+		;;
 	esac
 done
 shift $((OPTIND - 1))
@@ -77,9 +86,8 @@ if [ $(id -u) -ne 0 ]; then
 	exit 1
 fi
 
-
-if [ ! -z "$configfile" ]; then
-    . $configfile
+if [ -n "$configfile" ]; then
+	. "$(absolutePath "$configfile")"
 fi
 
 createTempDir
@@ -97,6 +105,10 @@ mkdir -p /etc/cloud-installer
 
 if [ ! -e /etc/cloud-installer/installed ]; then
 	configureInstall
+	if [ $ret -ne 0 ]; then
+		# install cancelled by user
+		exit 0
+	fi
 
 	case $install_type in
 	Multi-system)
@@ -109,10 +121,6 @@ if [ ! -e /etc/cloud-installer/installed ]; then
 		install=true # install only implied
 		landscapeInstall
 		;;
-	*)
-		# install cancelled by user
-		exit 0
-		;;
 	esac
 	touch /etc/cloud-installer/installed
 else
@@ -120,5 +128,5 @@ else
 fi
 if [ -z "$install" ]; then
 	exitInstall
-	cd "/home/$INSTALL_USER"; exec sudo -H -u "$INSTALL_USER" cloud-status
+	cd "/home/$INSTALL_USER"; exec sudo -H -u "$INSTALL_USER" cloud-status $enableswift
 fi

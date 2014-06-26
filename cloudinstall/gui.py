@@ -19,30 +19,29 @@
 """ Pegasus - gui interface to  Installer """
 
 from operator import attrgetter
-from os import write, close, path
+from os import write, close, getenv
 from traceback import format_exc
 import re
 import threading
 import logging
-from importlib import import_module
-import pkgutil
 from multiprocessing import cpu_count
 
 from urwid import (AttrWrap, AttrMap, Text, Columns, Overlay, LineBox,
                    ListBox, Filler, Button, BoxAdapter, Frame, WidgetWrap,
-                   SimpleListWalker, Edit, CheckBox, RadioButton, IntEdit,
+                   SimpleListWalker, Edit, RadioButton, IntEdit,
                    MainLoop, ExitMainLoop)
 
 from cloudinstall.juju.client import JujuClient
 from cloudinstall import pegasus
 from cloudinstall import utils
+from cloudinstall.charms import CharmQueue, get_charm
 
 log = logging.getLogger('cloudinstall.gui')
 
 TITLE_TEXT = "Ubuntu Openstack Installer"
 
 # - Properties ----------------------------------------------------------------
-IS_TTY = re.match('/dev/tty[0-9]', utils.get_command_output('tty')[1])
+IS_TTY = re.match('/dev/tty[0-9]', utils.get_command_output('tty')['stdout'])
 
 # Time to lock in seconds
 LOCK_TIME = 120
@@ -56,7 +55,7 @@ STYLES = [
     ('body',         'white',      'black',),
     ('border',       'brown',      'dark magenta'),
     ('focus',        'black',      'dark green'),
-    ('dialog',       'black',      'dark cyan'),
+    ('dialog',       'black',      'light gray'),
     ('list_title',   'black',      'light gray',),
     ('error',        'white',      'dark red'),
 ]
@@ -79,7 +78,8 @@ class ControllerOverlay(Overlay):
     NODE_SETUP = "Your node has been correctly detected. " \
                  "Please wait until setup is complete "
 
-    def __init__(self, underlying, command_runner):
+    def __init__(self, underlying, command_runner, opts):
+        self.opts = opts
         self.underlying = underlying
         self.command_runner = command_runner
         self.done = False
@@ -87,6 +87,7 @@ class ControllerOverlay(Overlay):
         self.deployed_charm_classes = []
         self.finalized_charm_classes = []
         self.single_net_configured = False
+        self.lxc_root_tarball_configured = False
         self.info_text = Text(self.NODE_WAIT
                               if pegasus.SINGLE_SYSTEM
                               else self.PXE_BOOT)
@@ -103,7 +104,7 @@ class ControllerOverlay(Overlay):
     def process(self, juju_state, maas_state):
         """ Process a node list. Returns True if the overlay still needs to be
         shown, false otherwise. """
-        if self.done:
+        if self.done or len(list(juju_state.services)) >= 9:
             return False
 
         continue_ = self._process(juju_state, maas_state)
@@ -113,16 +114,17 @@ class ControllerOverlay(Overlay):
         return continue_
 
     def _process(self, juju_state, maas_state):
-        import cloudinstall.charms
-
-        charm_modules = [import_module('cloudinstall.charms.' + mname)
-                         for (_, mname, _) in
-                         pkgutil.iter_modules(cloudinstall.charms.__path__)]
-
+        charm_modules = utils.load_charms()
         charm_classes = sorted([m.__charm_class__ for m in charm_modules
                                 if not m.__charm_class__.optional and
                                 not m.__charm_class__.disabled],
                                key=attrgetter('deploy_priority'))
+        # Add any additional charms enabled from command line
+        if self.opts.enable_swift:
+            for m in charm_modules:
+                if m.__charm_class__.name() == "swift-storage" or \
+                        m.__charm_class__.name() == "swift-proxy":
+                    charm_classes.append(m.__charm_class__)
 
         if self.machine is None:
             self.machine = self.get_controller_machine(juju_state, maas_state)
@@ -132,6 +134,15 @@ class ControllerOverlay(Overlay):
 
             if pegasus.SINGLE_SYSTEM and not self.single_net_configured:
                 self.configure_lxc_network()
+
+            # Speed up things if we go ahead and download the rootfs image
+            # from http://cloud-images.ubuntu.com/releases/trusty/release/
+            #
+            # Use: export LXC_ROOT_TARBALL=/path/to/rootfs_tarball.tar.gz
+            rootfs = getenv('LXC_ROOT_TARBALL', False)
+            if rootfs and not self.lxc_root_tarball_configured:
+                log.debug("Copying local copy of rootfs")
+                self.configure_lxc_root_tarball(rootfs)
 
             log.debug("starting install on "
                       "machine {mid}".format(mid=self.machine.machine_id))
@@ -155,34 +166,32 @@ class ControllerOverlay(Overlay):
 
                 log.debug("Deploying {c}".format(c=charm))
 
-                # Hardcode lxc on same machine as they are
-                # created on-demand.
-                charm.setup(_id='lxc:{mid}'.format(
-                    mid=self.machine.machine_id))
+                if charm.isolate:
+                    charm.setup()
+                else:
+                    # Hardcode lxc on same machine as they are
+                    # created on-demand.
+                    charm.machine_id = 'lxc:{mid}'.format(
+                        mid=self.machine.machine_id)
+                    charm.setup()
                 self.deployed_charm_classes.append(charm_class)
 
         unfinalized_charm_classes = [c for c in self.deployed_charm_classes
                                      if c not in self.finalized_charm_classes]
 
+        charm_q = CharmQueue()
         if len(unfinalized_charm_classes) > 0:
-            self.info_text.set_text("Setting charm relations")
-            log.debug("Setting charm relations")
+            self.info_text.set_text("Setting charm relations "
+                                    "and post processing")
             for charm_class in unfinalized_charm_classes:
-
                 charm = charm_class(juju_state=juju_state)
-
-                if juju_state.service(charm.charm_name) is None:
-                    # Juju doesn't see the service related to this
-                    # charm yet, so defer setting its relations.
-                    log.debug("service not up yet for charm {c}".format(
-                        c=charm.charm_name))
-                    continue
-
-                log.debug("calling set_relations() for charm {c}".format(
-                    c=charm.charm_name))
-                charm.set_relations()
-                charm.post_proc()
+                charm_q.add_relation(charm)
+                charm_q.add_post_proc(charm)
                 self.finalized_charm_classes.append(charm_class)
+            if not charm_q.is_running:
+                charm_q.watch_relations()
+                charm_q.watch_post_proc()
+                charm_q.is_running = True
 
         log.debug("at end of process(), deployed_charm_classes={d}"
                   "finalized_charm_classes={f}".format(
@@ -223,8 +232,9 @@ class ControllerOverlay(Overlay):
         return None
 
     def get_started_machine(self, allocated):
-        started_machines = [m for m in allocated
-                            if m.agent_state == 'started']
+        started_machines = sorted([m for m in allocated
+                                   if m.agent_state == 'started'],
+                                  key=lambda m: int(m.machine_id))
         if len(started_machines) == 0:
             self.info_text.set_text("Waiting for a machine "
                                     "to become ready.")
@@ -233,22 +243,24 @@ class ControllerOverlay(Overlay):
         return started_machines[0]
 
     def configure_lxc_network(self):
-        # upload our lxc-host-only template
-        # and reboot so any containers will be deployed with
-        # the proper subnet
-        host = self.machine.dns_name
-        utils._run("scp -oStrictHostKeyChecking=no "
-                   "/usr/share/cloud-installer/templates/lxc-host-only "
-                   "ubuntu@{host}:/tmp/lxc-host-only".format(host=host))
-        cmds = []
-        cmds.append("sudo mv /tmp/lxc-host-only "
-                    "/etc/network/interfaces.d/lxcbr0.cfg")
-        cmds.append("sudo rm /etc/network/interfaces.d/eth0.cfg")
-        cmds.append("sudo reboot")
-        utils._run("ssh -oStrictHostKeyChecking=no "
-                   "ubuntu@{host} {cmds}".format(host=host,
-                                                 cmds=" && ".join(cmds)))
+        # upload our lxc-host-only template and setup bridge
+        utils.remote_cp(
+            self.machine.machine_id,
+            src="/usr/share/cloud-installer/templates/lxc-host-only",
+            dst="/tmp/lxc-host-only")
+        utils.remote_run(self.machine.machine_id,
+                         cmds="sudo chmod +x /tmp/lxc-host-only")
+        utils.remote_run(self.machine.machine_id,
+                         cmds="sudo /tmp/lxc-host-only")
         self.single_net_configured = True
+
+    def configure_lxc_root_tarball(self, rootfs):
+        """ Use a local copy of the cloud rootfs tarball """
+        host = self.machine.dns_name
+        cmds = "sudo mkdir -p /var/cache/lxc/cloud-trusty"
+        utils.remote_run(self.machine.machine_id, cmds=cmds)
+        utils.remote_cp(host, src=rootfs, dst="/var/cache/lxc/cloud-trusty")
+        self.lxc_root_tarball_configured = True
 
 
 def _wrap_focus(widgets, unfocused=None):
@@ -262,14 +274,12 @@ class AddCharmDialog(Overlay):
     """ Adding charm dialog """
 
     def __init__(self, underlying, juju_state, destroy, command_runner=None):
-        import cloudinstall.charms
-        charm_modules = [import_module('cloudinstall.charms.' + mname)
-                         for (_, mname, _) in
-                         pkgutil.iter_modules(cloudinstall.charms.__path__)]
-        charm_classes = [m.__charm_class__ for m in charm_modules
-                         if m.__charm_class__.allow_multi_units and
-                         not m.__charm_class__.disabled]
+        charm_modules = utils.load_charms()
+        self.charm_classes = [m.__charm_class__ for m in charm_modules
+                              if m.__charm_class__.allow_multi_units and
+                              not m.__charm_class__.disabled]
 
+        self.juju_state = juju_state
         self.cr = command_runner
         self.underlying = underlying
         self.destroy = destroy
@@ -277,7 +287,7 @@ class AddCharmDialog(Overlay):
         self.boxes = []
         self.bgroup = []
         first_index = 0
-        for i, charm_class in enumerate(charm_classes):
+        for i, charm_class in enumerate(self.charm_classes):
             charm = charm_class(juju_state=juju_state)
             if charm.name() and not first_index:
                 first_index = i
@@ -307,98 +317,83 @@ class AddCharmDialog(Overlay):
                     and r.get_state()][0]
         _charm_to_deploy = selected.label
         n = self.count_editor.value()
-        log.info("Adding {n} units of {charm}".format(
-            n=n, charm=_charm_to_deploy))
-        self.cr.add_unit(_charm_to_deploy, count=int(n))
+        svc = self.juju_state.service(_charm_to_deploy)
+        if svc.service:
+            log.info("Adding {n} units of {charm}".format(
+                     n=n, charm=_charm_to_deploy))
+            self.cr.add_unit(_charm_to_deploy, count=int(n))
+        else:
+            charm_q = CharmQueue()
+            charm = get_charm(_charm_to_deploy,
+                              self.juju_state)
+            if not charm.isolate:
+                charm.machine_id = 'lxc:{mid}'.format(mid="1")
+
+            charm_q.add_setup(charm)
+            charm_q.add_relation(charm)
+            charm_q.add_post_proc(charm)
+
+            # Add charm dependencies
+            if len(charm.related) > 0:
+                for c in charm.related:
+                    svc = self.juju_state.service(_charm_to_deploy)
+                    if not svc.service:
+                        log.info("Adding dependent charm {c}".format(c=c))
+                        charm_dep = get_charm(c,
+                                              self.juju_state)
+                        if not charm_dep.isolate:
+                            charm_dep.machine_id = 'lxc:{mid}'.format(mid="1")
+                        charm_q.add_setup(charm_dep)
+                        charm_q.add_relation(charm_dep)
+                        charm_q.add_post_proc(charm_dep)
+
+            if not charm_q.is_running:
+                charm_q.watch_setup()
+                charm_q.watch_relations()
+                charm_q.watch_post_proc()
+                charm_q.is_running = True
         self.destroy()
 
     def no(self, button):
         self.destroy()
 
 
-class ChangeStateDialog(Overlay):
-    def __init__(self, underlying, juju_state, on_success, on_cancel):
-        import cloudinstall.charms
-        charm_modules = [import_module('cloudinstall.charms.' + mname)
-                         for (_, mname, _) in
-                         pkgutil.iter_modules(cloudinstall.charms.__path__)]
-        charm_classes = sorted([m.__charm_class__ for m in charm_modules],
-                               key=attrgetter('deploy_priority'))
-
-        self.boxes = []
-        first_index = 0
-        for i, charm_class in enumerate(charm_classes):
-            charm = charm_class(juju_state=juju_state)
-            if charm.name() and not first_index:
-                first_index = i
-            r = CheckBox(charm.name())
-            r.text_label = charm.name()
-            self.boxes.append(r)
-        wrapped_boxes = _wrap_focus(self.boxes)
-
-        def ok(button):
-            selected = filter(lambda r: r.get_state(), self.boxes)
-            on_success([s.text_label for s in selected])
-
-        def cancel(button):
-            on_cancel()
-
-        bs = [Button("Ok", ok), Button("Cancel", cancel)]
-        wrapped_buttons = _wrap_focus(bs)
-        self.buttons = Columns(wrapped_buttons)
-        self.items = ListBox(wrapped_boxes)
-        self.items.set_focus(first_index)
-        ba = BoxAdapter(self.items, height=len(wrapped_boxes))
-        self.lb = ListBox([ba, self.count_editor, self.buttons])
-        root = LineBox(self.lb, title="Select new charm")
-        root = AttrMap(root, "dialog")
-
-        Overlay.__init__(self, root, underlying, 'center', 30, 'middle',
-                         len(wrapped_boxes) + 4)
-
-    def keypress(self, size, key):
-        if key == 'tab':
-            if self.lb.get_focus()[0] == self.buttons:
-                self.keypress(size, 'page up')
-            else:
-                self.keypress(size, 'page down')
-        return Overlay.keypress(self, size, key)
-
-
 class Node(WidgetWrap):
     """ A single ui node representation
     """
-    def __init__(self, service=None, open_dialog=None):
+    def __init__(self, service=None, open_dialog=None, juju_state=None):
         """
         Initialize Node
 
         :param service: charm service
         :param type: Service()
         """
-        self.service = service
-        self.units = (self.service.units)
         self.open_dialog = open_dialog
 
         unit_info = []
-        for u in self.units:
+        for u in sorted(service.units, key=attrgetter('unit_name')):
             info = "{unit_name} " \
                    "({status})".format(unit_name=u.unit_name,
                                        status=u.agent_state)
 
-            info = "{info}\n  " \
-                   "address: {address}".format(info=info,
-                                               address=u.public_address)
+            if u.public_address:
+                info += "\naddress: {address}".format(address=u.public_address)
+
             if 'error' in u.agent_state:
                 state_info = u.agent_state_info.lstrip()
-                info = "{info}\n  " \
-                       "info: {state_info}".format(info=info,
-                                                   state_info=state_info)
-            info = "{info}\n\n".format(info=info)
+                info += "\ninfo: {state_info}".format(state_info=state_info)
+
+            unit_machine = juju_state.machine(u.machine_id)
+            if unit_machine.agent_state is None and \
+               unit_machine.agent_state_info is not None:
+                info += "\nmachine info: " + unit_machine.agent_state_info
+
+            info += "\n\n"
             unit_info.append(('weight', 2, Text(info)))
 
         # machines
         m = [
-            (30, Text(self.service.service_name)),
+            (30, Text(service.service_name)),
             Columns(unit_info)
         ]
 
@@ -463,21 +458,8 @@ class CommandRunner(ListBox):
         return out
 
 
-# TODO: This and CommandRunner should really be merged
-class ConsoleMode(Frame):
-    def __init__(self):
-        header = [AttrWrap(Text(TITLE_TEXT), "border"),
-                  AttrWrap(Text('(Q) Quit'), "border"),
-                  AttrWrap(Text('(F8) Node list'), "border")]
-        header = Columns(header)
-        with open(path.expanduser('~/.cloud-install/commands.log')) as f:
-            body = f.readlines()
-        body = ListBox([Text(x) for x in body])
-        Frame.__init__(self, header=header, body=body)
-
-
 class NodeViewMode(Frame):
-    def __init__(self, loop):
+    def __init__(self, loop, opts):
         header = [AttrWrap(Text(TITLE_TEXT), "border"),
                   AttrWrap(Text('(F6) Add units'), "border"),
                   AttrWrap(Text('(F5) Refresh'), "border"),
@@ -496,11 +478,12 @@ class NodeViewMode(Frame):
         self.maas_state = None
         self.nodes = ListWithHeader(NODE_HEADER)
         self.loop = loop
+        self.opts = opts
 
         self.cr = CommandRunner()
         Frame.__init__(self, header=header, body=self.nodes,
                        footer=footer)
-        self.controller_overlay = ControllerOverlay(self, self.cr)
+        self.controller_overlay = ControllerOverlay(self, self.cr, self.opts)
         self._target = self.controller_overlay
 
     # TODO: get rid of this shim.
@@ -511,10 +494,6 @@ class NodeViewMode(Frame):
     @target.setter
     def target(self, val):
         self._target = val
-        # Don't switch from command runner back to us "randomly" (i.e. when
-        # the setup is complete and the overlay goes away).
-        if isinstance(self.loop.widget, ConsoleMode):
-            return
         # don't accidentally unlock
         if not isinstance(self.loop.widget, LockScreen):
             self.loop.widget = val
@@ -541,7 +520,7 @@ class NodeViewMode(Frame):
         :returns: data from the polling of services and the juju state
         :rtype: tuple (JujuState(), MaasState())
         """
-        log.debug("refresh_states() about to poll_state()")
+        log.debug("Syncing juju state.")
         return pegasus.poll_state()
 
     def do_update(self, juju_state, maas_state):
@@ -552,8 +531,19 @@ class NodeViewMode(Frame):
         :param maas_state: maas polled state
         :type maas_state MaasState()
         """
-        nodes = [Node(s, self.open_dialog)
-                 for s in juju_state.services]
+        deployed_services = sorted(juju_state.services,
+                                   key=attrgetter('service_name'))
+        deployed_service_names = [s.service_name for s in deployed_services]
+
+        charm_classes = sorted([m.__charm_class__ for m in utils.load_charms()
+                                if m.__charm_class__.charm_name in
+                                deployed_service_names],
+                               key=attrgetter('charm_name'))
+
+        a = sorted([(c.display_priority, c.charm_name,
+                     Node(s, self.open_dialog, juju_state))
+                    for (c, s) in zip(charm_classes, deployed_services)])
+        nodes = [node for (_, _, node) in a]
 
         if self.target == self.controller_overlay:
             continue_polling = self.controller_overlay.process(juju_state,
@@ -569,26 +559,27 @@ class NodeViewMode(Frame):
         for n in self.juju_state.services:
             for i in n.units:
                 if i.is_horizon:
-                    ip = i.public_address
-                    _url = "Horizon: " \
-                           "http://{ip}/horizon".format(ip=ip)
-                    self.horizon_url.set_text(_url)
-                    if "0.0.0.0" in i.public_address:
-                        self.status_info.set_text("[INFO] Nodes "
-                                                  "are still deploying")
-                    else:
+                    url = "Horizon: "
+                    if i.public_address:
+                        url += "http://{}/horizon".format(i.public_address)
                         self.status_info.set_text("[INFO] Nodes "
                                                   "are accessible")
+                    else:
+                        url += "Pending"
+                        self.status_info.set_text("[INFO] Nodes "
+                                                  "are still deploying")
+                    self.horizon_url.set_text(url)
                 if i.is_jujugui:
-                    _url = "Juju-GUI: " \
-                           "http://{name}/".format(name=i.public_address)
-                    self.jujugui_url.set_text(_url)
+                    if i.public_address:
+                        url = "Juju-GUI: http://{}/".format(i.public_address)
+                    else:
+                        url = "Juju-GUI: Pending"
+                    self.jujugui_url.set_text(url)
         self.loop.draw_screen()
 
     def tick(self):
         if self.ticks_left == 0:
             self.ticks_left = self.poll_interval
-            log.debug("NodeViewMode tick() calling refresh_states()")
             self.loop.run_async(self.refresh_states, self.update_and_redraw)
         self.ticks_left = self.ticks_left - 1
 
@@ -640,10 +631,10 @@ class LockScreen(Overlay):
 class PegasusGUI(MainLoop):
     """ Pegasus Entry class """
 
-    def __init__(self):
+    def __init__(self, opts):
+        self.opts = opts
         self.cr = CommandRunner()
-        self.console = ConsoleMode()
-        self.node_view = NodeViewMode(self)
+        self.node_view = NodeViewMode(self, self.opts)
         self.lock_ticks = 0  # start in a locked state
         self.locked = False
         self.juju_state, _ = pegasus.poll_state()
@@ -676,12 +667,6 @@ class PegasusGUI(MainLoop):
         # if we are locked, don't do anything
         if isinstance(self.widget, LockScreen):
             return None
-        if key == 'f8':
-            return
-            if self.widget == self.console:
-                self.widget = self.node_view.target
-            else:
-                self.widget = self.console
         if key in ['q', 'Q']:
             raise ExitMainLoop()
 
