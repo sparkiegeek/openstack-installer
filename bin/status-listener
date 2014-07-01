@@ -1,0 +1,94 @@
+#!/usr/bin/env python2.7
+#
+# Copyright 2014 Canonical, Ltd.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import kombu
+import os
+import yaml
+from subprocess import check_output
+import time
+import traceback
+
+STATUS_FILE_NAME = os.path.expanduser("~/.cloud-install/sync-status")
+
+def get_info():
+    "Read rabbitmq config from remote unit's relation data"
+    id_yaml = check_output(['juju', 'run', '--unit', 'glance-simplestreams-sync/0',
+                            'cat /etc/glance-simplestreams-sync/identity.yaml'])
+
+    id_conf = yaml.load(id_yaml)
+    hosts = id_conf.get('rabbit_hosts', None)
+    if hosts is not None:
+        host = hosts[0]
+    else:
+        host = id_conf['rabbit_host']
+
+    return (id_conf['rabbit_userid'],
+            id_conf['rabbit_password'],
+            host,
+            id_conf['rabbit_virtual_host'])
+
+
+status_message_exchange = kombu.Exchange("glance-simplestreams-sync-status")
+
+status_message_queue = kombu.Queue("glance-simplestreams-sync-status",
+                                   exchange=status_message_exchange)
+
+
+def update_status_file(body):
+    tempname = STATUS_FILE_NAME + ".tmp"
+    with open(tempname, 'w') as f:
+        f.write(str(body))
+        f.flush()
+
+    os.rename(tempname, STATUS_FILE_NAME)
+
+
+def process_message(body, message):
+    update_status_file(body)
+    message.ack()
+
+
+# Listen forever on rabbitmq port 
+if __name__ == "__main__":
+
+    update_status_file("Waiting for initial status.")
+
+    info_found = False
+    while not info_found:
+        try:
+            username, password, host, virtual_host = get_info()
+            info_found = True
+        except:
+            with open("{}.log".format(STATUS_FILE_NAME), 'w+') as f:
+                f.write(traceback.format_exc())
+                f.write("will reattempt to make connection.")
+            time.sleep(2)
+
+    try:
+        url = "amqp://{}:{}@{}/{}".format(username, password, host, virtual_host)
+
+        with kombu.BrokerConnection(url) as conn:
+            status_message_queue(conn.channel()).declare()
+
+            with conn.Consumer(status_message_queue,
+                               callbacks=[process_message]) as consumer:
+                while True:
+                    conn.drain_events()
+    except:
+        update_status_file("error, see {}.error".format(STATUS_FILE_NAME))
+        with open("{}.error".format(STATUS_FILE_NAME), 'w+') as f:
+            f.write(traceback.format_exc())

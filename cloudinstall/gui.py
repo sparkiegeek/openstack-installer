@@ -36,6 +36,7 @@ from cloudinstall import pegasus
 from cloudinstall import utils
 from cloudinstall.charms import CharmQueue, get_charm
 from cloudinstall.helpscreen import HelpScreen
+from cloudinstall.status import get_sync_status
 
 log = logging.getLogger('cloudinstall.gui')
 
@@ -362,14 +363,19 @@ class AddCharmDialog(Overlay):
 class Node(WidgetWrap):
     """ A single ui node representation
     """
-    def __init__(self, service=None, open_dialog=None, juju_state=None):
+    def __init__(self, service=None, open_dialog=None, juju_state=None,
+                 service_info=None):
         """
         Initialize Node
 
         :param service: charm service
+        :param open_dialog: callable to show state change dialog
+        :param juju_state: current juju state object
+        :param service_info: info string for service
         :param type: Service()
         """
         self.open_dialog = open_dialog
+        self.service_name = service.service_name
 
         unit_info = []
         for u in sorted(service.units, key=attrgetter('unit_name')):
@@ -393,8 +399,11 @@ class Node(WidgetWrap):
             unit_info.append(('weight', 2, Text(info)))
 
         # machines
+        service_text = self.service_name
+        if service_info:
+            service_text = self.service_name + "\n" + service_info
         m = [
-            (30, Text(service.service_name)),
+            (30, Text(service_text)),
             Columns(unit_info)
         ]
 
@@ -542,9 +551,18 @@ class NodeViewMode(Frame):
                                 deployed_service_names],
                                key=attrgetter('charm_name'))
 
+        service_infos = []
+        for n in deployed_service_names:
+            if n == 'glance-simplestreams-sync':
+                service_infos.append(get_sync_status())
+            else:
+                service_infos.append("")
+
         a = sorted([(c.display_priority, c.charm_name,
-                     Node(s, self.open_dialog, juju_state))
-                    for (c, s) in zip(charm_classes, deployed_services)])
+                     Node(s, self.open_dialog, juju_state, info))
+                    for (c, s, info) 
+                    in zip(charm_classes, deployed_services, service_infos)])
+
         nodes = [node for (_, _, node) in a]
 
         if self.target == self.controller_overlay:
