@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import atexit
 import os
 import subprocess
 
@@ -24,12 +25,14 @@ STATUS_FILE_NAME = os.path.expanduser("~/.cloud-install/sync-status")
 
 status_subprocess = None
 
+
 def get_sync_status():
     global status_subprocess
     if status_subprocess is None:
         status_listener_path = os.environ.get("SYNC_STATUS_LISTENER_PATH",
                                               SYNC_STATUS_LISTENER_PATH)
         status_subprocess = subprocess.Popen([status_listener_path])
+        atexit.register(status_subprocess.kill)
 
     if os.path.exists(STATUS_FILE_NAME):
         with open(STATUS_FILE_NAME) as sf:
