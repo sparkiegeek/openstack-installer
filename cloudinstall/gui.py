@@ -375,7 +375,6 @@ class Node(WidgetWrap):
         :param type: Service()
         """
         self.open_dialog = open_dialog
-        self.service_name = service.service_name
 
         unit_info = []
         for u in sorted(service.units, key=attrgetter('unit_name')):
@@ -400,7 +399,7 @@ class Node(WidgetWrap):
 
         # machines
         m = [
-            (30, Text(self.service_name)),
+            (30, Text(service.service_name)),
             Columns(unit_info)
         ]
 
