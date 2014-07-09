@@ -28,7 +28,7 @@ from multiprocessing import cpu_count
 
 from urwid import (AttrWrap, AttrMap, Text, Columns, Overlay, LineBox,
                    ListBox, Filler, Button, BoxAdapter, Frame, WidgetWrap,
-                   SimpleListWalker, Edit, RadioButton, IntEdit,
+                   SimpleListWalker, Edit, Pile, RadioButton, IntEdit,
                    MainLoop, ExitMainLoop)
 
 from cloudinstall.juju.client import JujuClient
@@ -399,16 +399,21 @@ class Node(WidgetWrap):
             unit_info.append(('weight', 2, Text(info)))
 
         # machines
-        service_text = self.service_name
-        if service_info:
-            service_text = self.service_name + "\n" + service_info
         m = [
-            (30, Text(service_text)),
+            (30, Text(self.service_name)),
             Columns(unit_info)
         ]
 
         cols = Columns(m)
-        self.__super.__init__(cols)
+
+        if service_info:
+            service_info = "\n    ".join(service_info.split("\n"))
+            service_text = Text("  - " + service_info + "\n")
+        else:
+            service_text = Text("")
+
+        p = Pile([cols, service_text])
+        self.__super.__init__(p)
 
     def selectable(self):
         return True
