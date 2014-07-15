@@ -57,7 +57,7 @@ def setup_logger(name=__name__):
         datefmt='%m-%d %H:%M:%S'))
 
     logger = logging.getLogger('')
-    env = os.environ.get('UCI_LOGLEVEL', 'DEBUG')
+    env = os.environ.get('UCI_LOGLEVEL', 'INFO')
     logger.setLevel(env)
     logger.addHandler(commandslog)
 
