@@ -128,5 +128,5 @@ else
 fi
 if [ -z "$install" ]; then
 	exitInstall
-	cd "/home/$INSTALL_USER"; exec sudo -H -u "$INSTALL_USER" cloud-status $enableswift
+	cd "$INSTALL_HOME"; exec sudo -H -u "$INSTALL_USER" cloud-status $enableswift
 fi
