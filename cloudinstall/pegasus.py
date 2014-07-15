@@ -138,7 +138,7 @@ def update_machine_info(juju, maas=None):
             if machine.status == 6:
                 machine.agent_state = "allocated"
             machine.dns_name = machine.hostname
-            log.debug("querying maas machine: {maas}".format(maas=machine))
+            log.info("querying maas machine: {maas}".format(maas=machine))
 
 
 def wait_for_services():
