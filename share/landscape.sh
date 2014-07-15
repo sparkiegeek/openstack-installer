@@ -25,13 +25,13 @@ deployLandscape()
 	end_percent=${1:-100}
 	mkfifo -m 0600 "$TMP/deployer-out"
 
-	# For now, we assume that the install user has the landscape charm with the
-	# right licensing configs cloned into their home directory; we can fix this
-	# later when the landscape charm deploys with a free license.
-	cd "/home/$INSTALL_USER/landscape-charm/config" && \
-	    sudo -H -u "$INSTALL_USER" \
-	    juju-deployer -Wdv -c landscape-deployments.yaml landscape-dense-maas \
-	    > "$TMP/deployer-out" 2>&1 &
+	# Randomize landscape's internal databse password.
+	sed -i -e "s/look-a-different-password/$(pwgen -s 32 1)/" \
+		$TEMPLATES/landscape-deployments.yaml
+
+	sudo -H -u "$INSTALL_USER" \
+		juju-deployer -Wdv -c $TEMPLATES/landscape-deployments.yaml landscape-dense-maas \
+		> "$TMP/deployer-out" 2>&1 &
 
 	lines_seen=0
 	while IFS=: read unused; do
