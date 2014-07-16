@@ -33,6 +33,10 @@ To start the installation run the following command
 
    $ sudo cloud-install
 
+.. note::
+
+   The installer should be run as a non-root user.
+
 An initial dialog box will appear asking you to select which type of
 install, choose **Multi-system**.
 
@@ -50,6 +54,16 @@ The installer will run through a series of steps starting with making
 sure the necessary bits are available for a multi system installation
 and ending with a `juju` bootstrapped system.
 
-.. todo::
+Troubleshooting
+^^^^^^^^^^^^^^^
 
-   Finish this guide.
+The installer keeps its own logs in **$HOME/.cloud-install/commands.log**.
+
+Uninstalling
+^^^^^^^^^^^^
+
+To uninstall and cleanup your system run the following
+
+.. code::
+
+    $ sudo cloud-install -u multi-system

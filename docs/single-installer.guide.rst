@@ -7,7 +7,7 @@ Pre-requisites
 Add the `cloud-installer` ppa to your system.
 
 .. code::
-
+   $ sudo apt-add-repository ppa:juju/stable
    $ sudo apt-add-repository ppa:cloud-installer/ppa
 
 .. note::
@@ -42,6 +42,10 @@ To start the installation run the following command
 
    $ sudo cloud-install
 
+.. note::
+
+    The installer should be run as a non-root user.
+
 Optional Flags
 
 .. code::
@@ -51,6 +55,7 @@ Optional Flags
                   automating install by pre-setting menu responses.
       -s          enable swift-storage
       -i          install only (don't invoke cloud-status)
+      -u          uninstall the cloud
       -h          print this message
 
 
@@ -92,3 +97,12 @@ Troubleshooting
 ^^^^^^^^^^^^^^^
 
 The installer keeps its own logs in **$HOME/.cloud-install/commands.log**.
+
+Uninstalling
+^^^^^^^^^^^^
+
+To uninstall and cleanup your system run the following
+
+.. code::
+
+    $ sudo cloud-install -u single-system
