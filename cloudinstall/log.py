@@ -62,4 +62,3 @@ def setup_logger(name=__name__):
     logger.addHandler(commandslog)
 
     return logger
-log = setup_logger()
