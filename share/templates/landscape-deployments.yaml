@@ -1,12 +1,3 @@
-# Copied from lp:landscape-charm /config/landscape-deployments.yaml
-# and then:
-#   # charm no longer requires a license file
-#   sed -e 's/license-file$/\/dev\/null/g' -i landscape-deployments.yaml
-#
-#   Users who want to use the landscape installer should:
-#   # $CONTENTS here is what is in https://pastebin.canonical.com/112787/
-#   # for now. When landscape is released, we can make this something public.
-#   sed -e 's/include-file:\/\/repo-file/$CONTENTS/g' -i landscape-deployments.yaml
 _common:
     services:
         rabbitmq-server:
@@ -46,7 +37,7 @@ landscape:
                 service-count: "2"
                 landscape-password: "look-a-different-password"
                 services: static appserver pingserver combo-loader async-frontend apiserver package-upload jobhandler package-search cron juju-sync
-                repository: include-file://repo-file
+                repository: ppa:landscape/14.07
                 license-file: file:///dev/null
         landscape-msg:
             charm: cs:precise/landscape-server
@@ -54,7 +45,7 @@ landscape:
             options:
                 landscape-password: "look-a-different-password"
                 services: msgserver
-                repository: include-file://repo-file
+                repository: ppa:landscape/14.07
                 license-file: file:///dev/null
     relations:
         - [landscape, rabbitmq-server]
