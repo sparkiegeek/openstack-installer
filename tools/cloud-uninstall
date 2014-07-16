@@ -76,7 +76,7 @@ case $WHAT in
     echo @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     echo Please run with either single-system or multi-system as an argument.
     echo Example:
-    echo   sudo cloud-uninstall single-system
+    echo   sudo cloud-install -u single-system
     echo @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     exit 1
     ;;
