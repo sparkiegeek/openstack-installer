@@ -37,7 +37,7 @@ landscape:
                 service-count: "2"
                 landscape-password: "look-a-different-password"
                 services: static appserver pingserver combo-loader async-frontend apiserver package-upload jobhandler package-search cron juju-sync
-                repository: ppa:landscape/14.07
+                repository: http://ppa.launchpad.net/landscape/14.07/ubuntu
                 license-file: file:///dev/null
         landscape-msg:
             charm: cs:precise/landscape-server
@@ -45,7 +45,7 @@ landscape:
             options:
                 landscape-password: "look-a-different-password"
                 services: msgserver
-                repository: ppa:landscape/14.07
+                repository: http://ppa.launchpad.net/landscape/14.07/ubuntu
                 license-file: file:///dev/null
     relations:
         - [landscape, rabbitmq-server]
