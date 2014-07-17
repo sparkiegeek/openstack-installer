@@ -74,7 +74,7 @@ class ControllerOverlay(Overlay):
                "Please PXE boot the node you would like to use."
 
     NODE_WAIT = "Please wait while the cloud controller is " \
-                "installed on you host system."
+                "installed on your host system."
 
     NODE_SETUP = "Your node has been correctly detected. " \
                  "Please wait until setup is complete "
@@ -593,6 +593,7 @@ class NodeViewMode(Frame):
         """
         if key in ['h', '?']:
             prev_target = self.target
+
             def remove_helpscreen():
                 self.target = prev_target
             self.target = HelpScreen(self.target, remove_helpscreen)
