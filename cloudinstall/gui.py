@@ -35,6 +35,7 @@ from cloudinstall.juju.client import JujuClient
 from cloudinstall import pegasus
 from cloudinstall import utils
 from cloudinstall.charms import CharmQueue, get_charm
+from cloudinstall.helpscreen import HelpScreen
 
 log = logging.getLogger('cloudinstall.gui')
 
@@ -73,7 +74,7 @@ class ControllerOverlay(Overlay):
                "Please PXE boot the node you would like to use."
 
     NODE_WAIT = "Please wait while the cloud controller is " \
-                "installed on your host system."
+                "installed on you host system."
 
     NODE_SETUP = "Your node has been correctly detected. " \
                  "Please wait until setup is complete "
@@ -590,6 +591,12 @@ class NodeViewMode(Frame):
 
         * F5 - Refreshes the node list
         """
+        if key in ['h', '?']:
+            prev_target = self.target
+            def remove_helpscreen():
+                self.target = prev_target
+            self.target = HelpScreen(self.target, remove_helpscreen)
+
         if key == 'f5':
             self.ticks_left = 0
         return Frame.keypress(self, size, key)
