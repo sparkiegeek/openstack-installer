@@ -68,4 +68,4 @@ To uninstall and cleanup your system run the following
 
 .. code::
 
-    $ sudo cloud-install -u multi-system
+    $ sudo cloud-install -u
