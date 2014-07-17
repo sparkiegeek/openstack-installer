@@ -462,6 +462,7 @@ class CommandRunner(ListBox):
 class NodeViewMode(Frame):
     def __init__(self, loop, opts):
         header = [AttrWrap(Text(TITLE_TEXT), "border"),
+                  AttrWrap(Text('(?) Show Help'), "border"),
                   AttrWrap(Text('(F6) Add units'), "border"),
                   AttrWrap(Text('(F5) Refresh'), "border"),
                   AttrWrap(Text('(Q) Quit'), "border")]
