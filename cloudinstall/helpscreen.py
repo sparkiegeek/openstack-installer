@@ -81,21 +81,23 @@ main table. This indicates a failure to find a machine that matches
 the default constraints set for the service. See the log file for
 details.
 """,
-             ('bold', "End of Help Screen")
-]
+             ('bold', "End of Help Screen")]
 
 
 class ScrollableListBox(ListBox):
     def focus_next(self):
-        try: 
-            self.body.set_focus(self.body.get_next(self.body.get_focus()[1])[1])
+        try:
+            self.body.set_focus(self.body.get_next(
+                self.body.get_focus()[1])[1])
         except:
             pass
+
     def focus_previous(self):
-        try: 
-            self.body.set_focus(self.body.get_prev(self.body.get_focus()[1])[1])
+        try:
+            self.body.set_focus(self.body.get_prev(
+                self.body.get_focus()[1])[1])
         except:
-            pass            
+            pass
 
 
 class HelpScreen(Overlay):
