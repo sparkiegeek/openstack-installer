@@ -362,12 +362,16 @@ class AddCharmDialog(Overlay):
 class Node(WidgetWrap):
     """ A single ui node representation
     """
-    def __init__(self, service=None, open_dialog=None, juju_state=None):
+    def __init__(self, service=None, open_dialog=None, juju_state=None,
+                 charm_class=None):
         """
         Initialize Node
 
         :param service: charm service
         :param type: Service()
+        :param open_dialog: function to open a dialog to interact with service
+        :param juju_state: current JujuState(), used for machine info
+        :param charm_class: Charm subclass used to create this service
         """
         self.open_dialog = open_dialog
 
@@ -387,7 +391,14 @@ class Node(WidgetWrap):
             unit_machine = juju_state.machine(u.machine_id)
             if unit_machine.agent_state is None and \
                unit_machine.agent_state_info is not None:
-                info += "\nmachine info: " + unit_machine.agent_state_info
+
+                if "409" in unit_machine.agent_state_info and \
+                   charm_class is not None:
+                    info += "\nERROR: found no machines meeting constraints:\n"
+                    info += ', '.join(["{}='{}'".format(k,v) for k,v
+                                       in charm_class.constraints.items()])
+                else:
+                    info += "\nmachine info: " + unit_machine.agent_state_info
 
             info += "\n\n"
             unit_info.append(('weight', 2, Text(info)))
@@ -543,7 +554,7 @@ class NodeViewMode(Frame):
                                key=attrgetter('charm_name'))
 
         a = sorted([(c.display_priority, c.charm_name,
-                     Node(s, self.open_dialog, juju_state))
+                     Node(s, self.open_dialog, juju_state, c))
                     for (c, s) in zip(charm_classes, deployed_services)])
         nodes = [node for (_, _, node) in a]
 
