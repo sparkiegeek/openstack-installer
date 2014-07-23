@@ -564,7 +564,7 @@ class NodeViewMode(Frame):
 
         a = sorted([(c.display_priority, c.charm_name,
                      Node(s, self.open_dialog, juju_state, info))
-                    for (c, s, info) 
+                    for (c, s, info)
                     in zip(charm_classes, deployed_services, service_infos)])
 
         nodes = [node for (_, _, node) in a]

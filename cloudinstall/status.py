@@ -39,4 +39,3 @@ def get_sync_status():
             return sf.read()
     else:
         return ""
-
