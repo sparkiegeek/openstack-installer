@@ -31,6 +31,7 @@ Architecture: all
 Depends: gawk,
          nmap,
          pwgen,
+         python-kombu,
          python3-all,
          python3-mock,
          python3-nose,
