@@ -17,6 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import atexit
+import logging
 import os
 import subprocess
 
@@ -25,17 +26,27 @@ STATUS_FILE_NAME = os.path.expanduser("~/.cloud-install/sync-status")
 
 status_subprocess = None
 
+log = logging.getLogger('cloudinstall.status')
+
 
 def get_sync_status():
     global status_subprocess
     if status_subprocess is None:
         status_listener_path = os.environ.get("SYNC_STATUS_LISTENER_PATH",
                                               SYNC_STATUS_LISTENER_PATH)
-        status_subprocess = subprocess.Popen([status_listener_path])
-        atexit.register(status_subprocess.kill)
+        log.debug('starting status listener {}'.format(status_listener_path))
+        try:
+            status_subprocess = subprocess.Popen([status_listener_path])
+            atexit.register(status_subprocess.kill)
+        except OSError:
+            log.exception("Error starting status listener")
+            status_subprocess = None
 
     if os.path.exists(STATUS_FILE_NAME):
         with open(STATUS_FILE_NAME) as sf:
-            return sf.read()
+            status = sf.read()
+        log.debug("got status '{}' from listener file".format(status))
+        return status
     else:
+        log.debug("No status file found, returning empty status.")
         return ""
