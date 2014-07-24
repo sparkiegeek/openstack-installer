@@ -24,6 +24,7 @@ import os
 
 from logging.handlers import TimedRotatingFileHandler
 
+
 def setup_logger(name=__name__):
     """setup logging
 
