@@ -22,6 +22,7 @@
 import logging
 import os
 
+from logging.handlers import TimedRotatingFileHandler
 
 def setup_logger(name=__name__):
     """setup logging
@@ -50,14 +51,19 @@ def setup_logger(name=__name__):
     CONFIG_DIR = '.cloud-install'
     CONFIG_PATH = os.path.join(HOME, CONFIG_DIR)
     LOGFILE = os.path.join(CONFIG_PATH, 'commands.log')
-    commandslog = logging.FileHandler(LOGFILE, 'w')
+    commandslog = TimedRotatingFileHandler(LOGFILE,
+                                           when='D',
+                                           interval=1,
+                                           backupCount=7)
     commandslog.setFormatter(logging.Formatter(
         '%(levelname)-9s * %(asctime)s [PID:%(process)d] * %(name)s * '
         '%(message)s',
         datefmt='%m-%d %H:%M:%S'))
 
     logger = logging.getLogger('')
-    env = os.environ.get('UCI_LOGLEVEL', 'INFO')
+    env = os.environ.get('UCI_LOGLEVEL', 'DEBUG')
+    f = logging.Filter(name='cloudinstall')
+    commandslog.addFilter(f)
     logger.setLevel(env)
     logger.addHandler(commandslog)
 
