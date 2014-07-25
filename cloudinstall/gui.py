@@ -28,7 +28,7 @@ from multiprocessing import cpu_count
 
 from urwid import (AttrWrap, AttrMap, Text, Columns, Overlay, LineBox,
                    ListBox, Filler, Button, BoxAdapter, Frame, WidgetWrap,
-                   SimpleListWalker, Edit, RadioButton, IntEdit,
+                   SimpleListWalker, Edit, Pile, RadioButton, IntEdit,
                    MainLoop, ExitMainLoop)
 
 from cloudinstall.juju.client import JujuClient
@@ -36,6 +36,7 @@ from cloudinstall import pegasus
 from cloudinstall import utils
 from cloudinstall.charms import CharmQueue, get_charm
 from cloudinstall.helpscreen import HelpScreen
+from cloudinstall.status import get_sync_status
 
 log = logging.getLogger('cloudinstall.gui')
 
@@ -363,15 +364,16 @@ class Node(WidgetWrap):
     """ A single ui node representation
     """
     def __init__(self, service=None, open_dialog=None, juju_state=None,
-                 charm_class=None):
+                 charm_class=None, service_info=None):
         """
         Initialize Node
 
         :param service: charm service
-        :param type: Service()
-        :param open_dialog: function to open a dialog to interact with service
+        :param open_dialog: callable to show state change dialog
         :param juju_state: current JujuState(), used for machine info
         :param charm_class: Charm subclass used to create this service
+        :param service_info: info string for service
+
         """
         self.open_dialog = open_dialog
 
@@ -410,7 +412,15 @@ class Node(WidgetWrap):
         ]
 
         cols = Columns(m)
-        self.__super.__init__(cols)
+
+        if service_info:
+            service_info = "\n    ".join(service_info.split("\n"))
+            service_text = Text("  - " + service_info + "\n")
+        else:
+            service_text = Text("")
+
+        p = Pile([cols, service_text])
+        self.__super.__init__(p)
 
     def selectable(self):
         return True
@@ -553,9 +563,18 @@ class NodeViewMode(Frame):
                                 deployed_service_names],
                                key=attrgetter('charm_name'))
 
+        service_infos = []
+        for n in deployed_service_names:
+            if n == 'glance-simplestreams-sync':
+                service_infos.append(get_sync_status())
+            else:
+                service_infos.append("")
+
         a = sorted([(c.display_priority, c.charm_name,
-                     Node(s, self.open_dialog, juju_state, c))
-                    for (c, s) in zip(charm_classes, deployed_services)])
+                     Node(s, self.open_dialog, juju_state, c, info))
+                    for (c, s, info)
+                    in zip(charm_classes, deployed_services, service_infos)])
+
         nodes = [node for (_, _, node) in a]
 
         if self.target == self.controller_overlay:
