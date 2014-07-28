@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+import glob
 import logging
 import os
 import platform
@@ -27,8 +27,8 @@ from cloudinstall.charms import (CharmBase, DisplayPriorities,
                                  CHARM_CONFIG,
                                  CHARM_CONFIG_FILENAME)
 
-CHARM_STABLE_URL = ("https://github.com/Ubuntu-Solutions-Engineering/"
-                    "glance-simplestreams-sync-charm/archive/stable.zip")
+CHARM_STABLE_URL = ("https://api.github.com/repos/Ubuntu-Solutions-Engineering"
+                    "/glance-simplestreams-sync-charm/tarball/stable")
 
 # Not necessarily required to match because we're local, but easy enough to get
 CURRENT_DISTRO = platform.linux_distribution()[-1]
@@ -50,20 +50,29 @@ class CharmGlanceSimplestreamsSync(CharmBase):
             os.makedirs(CHARMS_DIR)
 
         r = requests.get(CHARM_STABLE_URL, verify=True)
-        zf_name = os.path.join(CHARMS_DIR, 'stable.zip')
-        with open(zf_name, mode='wb') as zf:
-            zf.write(r.content)
+        tarball_name = os.path.join(CHARMS_DIR, 'stable.tar.gz')
+        with open(tarball_name, mode='wb') as tarball:
+            tarball.write(r.content)
 
         try:
-            subprocess.check_output(['unzip', '-d', CHARMS_DIR,
-                                     zf_name], stderr=subprocess.STDOUT)
+            subprocess.check_output(['tar', '-C', CHARMS_DIR, '-zxf',
+                                     tarball_name], stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            log.warning("error unzipping: rc={} out={}".format(e.returncode,
+            log.warning("error untarring: rc={} out={}".format(e.returncode,
                                                                e.output))
             raise e
 
-        src = os.path.join(CHARMS_DIR,
-                           'glance-simplestreams-sync-charm-stable')
+        # filename includes commit hash at end:
+        srcpat = os.path.join(CHARMS_DIR,
+                              'Ubuntu-Solutions-Engineering-'
+                              'glance-simplestreams-sync-charm-*')
+        srcs = glob.glob(srcpat)
+        if len(srcs) != 1:
+            log.warning("error finding downloaded stable charm."
+                        " got {}".format(srcs))
+            raise Exception("Could not find downloaded stable charm.")
+
+        src = srcs[0]
         dest = os.path.join(CHARMS_DIR, CURRENT_DISTRO,
                             'glance-simplestreams-sync')
         if os.path.exists(dest):
