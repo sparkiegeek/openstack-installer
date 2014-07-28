@@ -396,9 +396,13 @@ class Node(WidgetWrap):
 
                 if "409" in unit_machine.agent_state_info and \
                    charm_class is not None:
-                    info += "\nERROR: found no machines meeting constraints:\n"
-                    info += ', '.join(["{}='{}'".format(k, v) for k, v
-                                       in charm_class.constraints.items()])
+                    if charm_class.constraints is not None:
+                        info += "\nERROR: found no machines meeting"
+                        info += " constraints:\n"
+                        info += ', '.join(["{}='{}'".format(k, v) for k, v
+                                           in charm_class.constraints.items()])
+                    else:
+                        info += "\nERROR: no machines available for unit."
                 else:
                     info += "\nmachine info: " + unit_machine.agent_state_info
 
