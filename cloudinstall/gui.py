@@ -59,7 +59,8 @@ STYLES = [
     ('focus',        'black',      'dark green'),
     ('dialog',       'black',      'light gray'),
     ('list_title',   'black',      'light gray',),
-    ('error',        'white',      'dark red'),
+    ('error',        'dark red',   ''),
+    ('info',         'light blue', ''),
 ]
 
 RADIO_STATES = list(pegasus.ALLOCATION.values())
@@ -379,16 +380,18 @@ class Node(WidgetWrap):
 
         unit_info = []
         for u in sorted(service.units, key=attrgetter('unit_name')):
-            info = "{unit_name} " \
-                   "({status})".format(unit_name=u.unit_name,
-                                       status=u.agent_state)
+            info = ["{unit_name} "
+                    "({status})".format(unit_name=u.unit_name,
+                                        status=u.agent_state)]
 
             if u.public_address:
-                info += "\naddress: {address}".format(address=u.public_address)
+                info.append("\naddress:"
+                            " {address}".format(address=u.public_address))
 
             if 'error' in u.agent_state:
                 state_info = u.agent_state_info.lstrip()
-                info += "\ninfo: {state_info}".format(state_info=state_info)
+                info.append("\n", ('error', "info:"),
+                            " {state_info}".format(state_info=state_info))
 
             unit_machine = juju_state.machine(u.machine_id)
             if unit_machine.agent_state is None and \
@@ -396,34 +399,41 @@ class Node(WidgetWrap):
 
                 if "409" in unit_machine.agent_state_info and \
                    charm_class is not None:
+                    info += ["\n", ('error', "[ERROR]:")]
                     if charm_class.constraints is not None:
-                        info += "\nERROR: found no machines meeting"
-                        info += " constraints:\n"
-                        info += ', '.join(["{}='{}'".format(k, v) for k, v
-                                           in charm_class.constraints.items()])
+                        info += [" found no machines meeting constraints:\n"]
+                        info += [', '.join(["{}='{}'".format(k, v) for k, v in
+                                            charm_class.constraints.items()])]
                     else:
-                        info += "\nERROR: no machines available for unit."
-                else:
-                    info += "\nmachine info: " + unit_machine.agent_state_info
+                        info += [" no machines available for unit."]
 
-            info += "\n\n"
+                else:
+                    info += ["\n", ('error', "[machine info]:"),
+                             unit_machine.agent_state_info]
+
             unit_info.append(('weight', 2, Text(info)))
 
-        # machines
+        column_one_width = 30
         m = [
-            (30, Text(service.service_name)),
+            (column_one_width, Text(service.service_name)),
             Columns(unit_info)
         ]
 
         cols = Columns(m)
 
         if service_info:
-            service_info = "\n    ".join(service_info.split("\n"))
-            service_text = Text("  - " + service_info + "\n")
+            ls = service_info.split("\n")
+            infotag = "[INFO]:"
+            infopad = " " * column_one_width
+            text_components = [infopad, ('info', infotag), " "]
+            joinstr = "\n" + infopad
+            text_components.append(joinstr.join(ls))
+
+            service_text = Text(text_components)
         else:
             service_text = Text("")
 
-        p = Pile([cols, service_text])
+        p = Pile([cols, service_text, Text("\n\n")])
         self.__super.__init__(p)
 
     def selectable(self):
