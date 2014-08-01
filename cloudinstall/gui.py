@@ -390,8 +390,8 @@ class Node(WidgetWrap):
 
             if 'error' in u.agent_state:
                 state_info = u.agent_state_info.lstrip()
-                info.append("\n", ('error', "info:"),
-                            " {state_info}".format(state_info=state_info))
+                info += ["\n", ('error', "[ERROR]:"),
+                         " {state_info}".format(state_info=state_info)]
 
             unit_machine = juju_state.machine(u.machine_id)
             if unit_machine.agent_state is None and \
