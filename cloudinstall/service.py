@@ -161,7 +161,7 @@ class Service:
                 return True
             return False
 
-        return next(filter(_match, self.units), Unit('unknown', []))
+        return next(filter(_match, self.units), Unit('unknown', {}))
 
     @property
     def units(self):
