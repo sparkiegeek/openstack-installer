@@ -43,12 +43,13 @@ class CharmCeph(CharmBase):
         """ Custom setup for ceph """
         if not self.has_quorum():
             log.debug("Insufficient machines allocated - ceph can't deploy.")
-            return
+            return True
         if not self.is_multi:
             log.debug("Ceph not currently supported on single installs")
-            return
+            return True
 
         self.client.deploy(self.charm_name,
                            dict(instances=self.default_instances))
+        return False
 
 __charm_class__ = CharmCeph
