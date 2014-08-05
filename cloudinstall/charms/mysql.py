@@ -25,4 +25,7 @@ class CharmMysql(CharmBase):
     charm_name = 'mysql'
     display_name = 'MySQL'
 
+    # must be < keystone, or keystone will never deploy
+    deploy_priority = 100
+
 __charm_class__ = CharmMysql

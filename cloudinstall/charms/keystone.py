@@ -16,7 +16,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
+
 from cloudinstall.charms import CharmBase
+
+log = logging.getLogger('cloudinstall.charms.keystone')
 
 
 class CharmKeystone(CharmBase):
@@ -26,10 +30,15 @@ class CharmKeystone(CharmBase):
     display_name = 'Keystone'
     related = ['mysql']
 
+    # must be > mysql or keystone will never deploy
+    deploy_priority = 200
+
     def setup(self):
         mysql = self.wait_for_agent('mysql')
         if not mysql:
+            log.debug("mysql not yet available, deferring keystone deploy")
             return True
-        super().setup()
+        log.debug("mysql is available, deploying keystone")
+        return super().setup()
 
 __charm_class__ = CharmKeystone

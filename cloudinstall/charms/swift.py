@@ -48,6 +48,7 @@ class CharmSwift(CharmBase):
             kwds['configfile'] = CHARM_CONFIG_FILENAME
 
         self.client.deploy(self.charm_name, kwds)
+        return False
 
     def post_proc(self):
         self.client.set_config('glance-simplestreams-sync',

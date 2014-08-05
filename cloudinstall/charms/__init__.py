@@ -165,10 +165,17 @@ export OS_REGION_NAME=RegionOne
         return class_.__name__.lower()
 
     def setup(self):
-        """ Deploy charm and configuration options
+        """Deploy charm and configuration options
 
         The default should be sufficient but if more functionality
         is needed this should be overridden.
+
+        returns True if deploy command was deferred for some reason.
+        returns False if no error occurred and deploy command was issued.
+
+        Note that the False (no-error) return value does not indicate
+        that service is up and running.
+
         """
         kwds = {}
         kwds['machine_id'] = self.machine_id
@@ -183,6 +190,8 @@ export OS_REGION_NAME=RegionOne
             self.client.deploy(self.charm_name, kwds)
         else:
             self.client.deploy(self.charm_name, kwds)
+
+        return False
 
     def set_relations(self):
         """ Setup charm relations

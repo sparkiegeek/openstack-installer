@@ -107,7 +107,8 @@ class ControllerOverlay(Overlay):
     def process(self, juju_state, maas_state):
         """ Process a node list. Returns True if the overlay still needs to be
         shown, false otherwise. """
-        if self.done or len(list(juju_state.services)) >= 9:
+        if self.done:
+            log.debug("ControllerOverlay: done.")
             return False
 
         continue_ = self._process(juju_state, maas_state)
@@ -117,6 +118,8 @@ class ControllerOverlay(Overlay):
         return continue_
 
     def _process(self, juju_state, maas_state):
+        log.debug("process() starting")
+
         charm_modules = utils.load_charms()
         charm_classes = sorted([m.__charm_class__ for m in charm_modules
                                 if not m.__charm_class__.optional and
@@ -153,8 +156,10 @@ class ControllerOverlay(Overlay):
         undeployed_charm_classes = [c for c in charm_classes
                                     if c not in self.deployed_charm_classes]
 
+        log.debug("undeployed charms: {}".format([c.charm_name for c in
+                                                  undeployed_charm_classes]))
+
         if len(undeployed_charm_classes) > 0:
-            self.info_text.set_text("Deploying charms")
             log.debug("Deploying charms")
             for charm_class in undeployed_charm_classes:
                 charm = charm_class(juju_state=juju_state)
@@ -170,15 +175,28 @@ class ControllerOverlay(Overlay):
                 log.debug("Deploying {c}".format(c=charm))
 
                 if charm.isolate:
-                    charm.setup()
+                    deploy_err = charm.setup()
                 else:
                     # Hardcode lxc on same machine as they are
                     # created on-demand.
                     charm.machine_id = 'lxc:{mid}'.format(
                         mid=self.machine.machine_id)
-                    charm.setup()
-                self.deployed_charm_classes.append(charm_class)
+                    deploy_err = charm.setup()
 
+                if deploy_err:
+                    log.debug("{} is deferred, will re-poll.".format(charm))
+                    return True
+                else:
+                    log.debug("Issued deploy for {}".format(charm))
+                    self.deployed_charm_classes.append(charm_class)
+
+                num_deployed = len(self.deployed_charm_classes)
+                msg = ("Deployed "
+                       "{} of {} charms".format(num_deployed,
+                                                len(undeployed_charm_classes)))
+                self.info_text.set_text(msg)
+
+        log.debug("Starting queue for relation and post-processing")
         unfinalized_charm_classes = [c for c in self.deployed_charm_classes
                                      if c not in self.finalized_charm_classes]
 
@@ -198,8 +216,8 @@ class ControllerOverlay(Overlay):
 
         log.debug("at end of process(), deployed_charm_classes={d}"
                   "finalized_charm_classes={f}".format(
-                      d=self.deployed_charm_classes,
-                      f=self.finalized_charm_classes))
+                      d=[c.charm_name for c in self.deployed_charm_classes],
+                      f=[c.charm_name for c in self.finalized_charm_classes]))
 
         if len(self.finalized_charm_classes) == len(charm_classes):
             log.debug("Charm setup done.")
