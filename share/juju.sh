@@ -122,7 +122,7 @@ configureJuju()
 
 # Bootstrap Juju inside container
 #
-# Creates an LXC container, registers it in MAAS (as a fake machine), then
+# Creates a KVM, registers it in MAAS (as a virtual machine), then
 # bootstraps Juju using normal MAAS provider process.
 #
 # jujuBootstrap uuid
@@ -132,56 +132,33 @@ jujuBootstrap()
 {
 	cluster_uuid=$1
 
-	# Juju >= 1.19 supports vlans. Since we're bootstrapping into a container,
-	# when they try to modprobe the vlan module it won't work (viz. LP #1316762)
-	# inside the container, so our solution is to add it outside the container so
-	# that containers can use vlans.
-	modprobe 8021q
-
-	lxc-create -n juju-bootstrap -t ubuntu-cloud -- -r trusty
-	sed -e "s/^lxc.network.link.*$/lxc.network.link = br0/" -i \
-	    /var/lib/lxc/juju-bootstrap/config
-	printf "\n%s\n%s\n" "# Autostart on reboot" "lxc.start.auto = 1" \
-	    >> /var/lib/lxc/juju-bootstrap/config
-
-	# We need to allow nested LXCs in case people want to deploy --to lxc:0 (as
-	# landscape-dense-maas does).
-	printf "\n%s\n%s\n%s\n" "# Allow nested containers" "lxc.mount.auto = cgroup" \
-	    "lxc.aa_profile = lxc-container-default-with-nesting" \
-	    >> /var/lib/lxc/juju-bootstrap/config
-
-	# lxc has to look like vanilla maas ubuntu for juju cloud-init script
-	# to run
-	rm /var/lib/lxc/juju-bootstrap/rootfs/etc/network/interfaces.d/eth0.cfg
-	printf "%s\n%s\n" "auto eth0" "iface eth0 inet dhcp" \
-	    >> /var/lib/lxc/juju-bootstrap/rootfs/etc/network/interfaces
-
-	mac=$(grep lxc.network.hwaddr /var/lib/lxc/juju-bootstrap/config \
-	    | cut -d " " -f 3)
-	virsh -c lxc:/// define $TEMPLATES/juju-bootstrap.xml
-
         # ensure that maas can use virsh:
         usermod -a -G libvirtd maas
-        service maas-cluster restart
+        service maas-clusterd restart
+
+        virt-install --name juju-bootstrap --ram=2048 --vcpus=1 \
+            --hvm --virt-type=kvm --pxe --boot network,hd \
+            --os-variant=ubuntutrusty --graphics vnc --noautoconsole \
+            --os-type=linux --accelerate \
+            --disk=/var/lib/libvirt/images/juju-bootstrap.qcow2,bus=virtio,format=qcow2,cache=none,sparse=true,size=20 \
+            --network=bridge=br0,model=virtio
+
+        mac=$(virsh dumpxml juju-bootstrap |grep 'mac address' | cut -d\' -f2)
 
 	# TODO dynamic architecture selection
 	maas maas nodes new architecture=amd64/generic mac_addresses=$mac \
 	    hostname=juju-bootstrap nodegroup=$cluster_uuid power_type=virsh \
-            power_parameters_power_address=lxc:/// \
-            power_parameters_power_id=juju-bootstrap 2>&1 "$INSTALL_HOME"/nodes-new-output.txt
-	system_id=$(nodeSystemId $mac)
-	wget -O $TMP/maas.creds \
-	    "http://localhost/MAAS/metadata/latest/by-id/$system_id/?op=get_preseed"
-	python2 /etc/maas/templates/commissioning-user-data/snippets/maas_signal.py \
-	    --config $TMP/maas.creds OK || true
+            power_parameters_power_address=qemu:///system \
+            power_parameters_power_id=juju-bootstrap
+
+        system_id=$(nodeSystemId $mac)
 
 	(cd "$INSTALL_HOME"; sudo -H -u "$INSTALL_USER" juju --show-log sync-tools)
-	(cd "$INSTALL_HOME"; sudo -H -u "$INSTALL_USER" juju bootstrap --upload-tools) &
-	waitForNodeStatus $system_id 6
-	rm -rf /var/lib/lxc/juju-bootstrap/rootfs/var/lib/cloud/seed/*
-	cp $TMP/maas.creds \
-	    /var/lib/lxc/juju-bootstrap/rootfs/etc/cloud/cloud.cfg.d/91_maas.cfg
 
-	#virsh -c lxc:/// start juju-bootstrap
-	#wait $!
+        waitForNodeStatus $system_id 4
+	(cd "$INSTALL_HOME"; sudo -H -u "$INSTALL_USER" juju bootstrap --upload-tools)&
+
+        # wait for juju-bootstrap to be READY (6) in MAAS:
+        waitForNodeStatus $system_id 6
+
 }
