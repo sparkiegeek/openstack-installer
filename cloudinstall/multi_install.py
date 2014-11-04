@@ -620,6 +620,7 @@ class MultiInstallNewMaas(MultiInstall):
                     new_bridgefile.write("\n")
                     changed_config = True
                     copylines, commentlines = True, True
+                    new_configfile.write(line)
                     continue
                 else:
                     copylines, commentlines = False, False
